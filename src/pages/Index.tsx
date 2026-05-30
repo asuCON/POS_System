@@ -2,6 +2,7 @@ import {
   ClipboardList, Receipt, UtensilsCrossed, BookOpen, Package, 
   Plus, ArrowRight, TrendingUp, Users, BarChart3, Clock
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +63,7 @@ const orderStatusBadge: Record<string, string> = {
 };
 
 const Index = () => {
+  const navigate = useNavigate();
   return (
     <div className="p-6 space-y-6 overflow-y-auto h-full">
       {/* Welcome */}
@@ -71,10 +73,10 @@ const Index = () => {
           <p className="text-muted-foreground text-sm">Here's your restaurant overview</p>
         </div>
         <div className="flex gap-2">
-          <Button className="gap-2">
+          <Button className="gap-2" onClick={() => navigate("/orders?new=1")}>
             <Plus className="h-4 w-4" /> New Order
           </Button>
-          <Button variant="outline" className="gap-2">
+          <Button variant="outline" className="gap-2" onClick={() => navigate("/tables")}>
             <UtensilsCrossed className="h-4 w-4" /> Tables
           </Button>
         </div>
@@ -100,7 +102,11 @@ const Index = () => {
         <h2 className="text-lg font-semibold text-foreground mb-3">Quick Access</h2>
         <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
           {quickAccess.map((item) => (
-            <Card key={item.label} className="hover:border-primary/40 transition-colors cursor-pointer group">
+            <Card
+              key={item.label}
+              onClick={() => navigate(item.url)}
+              className="hover:border-primary/40 transition-colors cursor-pointer group"
+            >
               <CardContent className="p-4 flex flex-col items-center gap-2 text-center">
                 <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
                   <item.icon className="h-5 w-5 text-primary" />
@@ -138,7 +144,7 @@ const Index = () => {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">Tables Status</CardTitle>
-              <Button variant="ghost" size="sm" className="text-xs text-primary gap-1">
+              <Button variant="ghost" size="sm" className="text-xs text-primary gap-1" onClick={() => navigate("/tables")}>
                 View All <ArrowRight className="h-3 w-3" />
               </Button>
             </div>
@@ -175,7 +181,7 @@ const Index = () => {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">Recent Orders</CardTitle>
-              <Button variant="ghost" size="sm" className="text-xs text-primary gap-1">
+              <Button variant="ghost" size="sm" className="text-xs text-primary gap-1" onClick={() => navigate("/orders")}>
                 View All <ArrowRight className="h-3 w-3" />
               </Button>
             </div>
@@ -183,7 +189,11 @@ const Index = () => {
           <CardContent>
             <div className="space-y-3">
               {recentOrders.map((order) => (
-                <div key={order.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                <div
+                  key={order.id}
+                  onClick={() => navigate("/orders")}
+                  className="flex items-center justify-between py-2 border-b border-border last:border-0 cursor-pointer hover:bg-muted/40 rounded-md px-2 -mx-2"
+                >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
                       <ClipboardList className="h-4 w-4 text-muted-foreground" />
