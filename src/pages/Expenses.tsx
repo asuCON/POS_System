@@ -4,54 +4,22 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  TrendingDown,
-  Plus,
-  Search,
-  ShoppingCart,
-  Zap,
-  Users,
-  Wrench,
-  Truck,
-  IndianRupee,
-  Calendar,
-  PieChart,
+  TrendingDown, Plus, Search, ShoppingCart, Zap, Users, Wrench, Truck,
+  IndianRupee, Calendar, PieChart, Download,
 } from "lucide-react";
-
-type ExpenseCategory = "supplies" | "utilities" | "salary" | "maintenance" | "delivery" | "other";
-
-interface Expense {
-  id: string;
-  title: string;
-  description: string;
-  amount: number;
-  category: ExpenseCategory;
-  date: Date;
-  paidBy: string;
-  receipt: boolean;
-}
+import { useData, ExpenseCategory } from "@/contexts/DataContext";
+import { toast } from "sonner";
 
 const categoryConfig: Record<ExpenseCategory, { label: string; icon: React.ReactNode; color: string }> = {
   supplies: { label: "Supplies", icon: <ShoppingCart className="h-4 w-4" />, color: "bg-primary/10 text-primary" },
@@ -62,42 +30,16 @@ const categoryConfig: Record<ExpenseCategory, { label: string; icon: React.React
   other: { label: "Other", icon: <IndianRupee className="h-4 w-4" />, color: "bg-muted text-muted-foreground" },
 };
 
-const paidByOptions = ["Ram", "Shyam", "Hari", "Sita", "Owner"];
-
-const generateExpenses = (): Expense[] => {
-  const items: { title: string; category: ExpenseCategory; range: [number, number] }[] = [
-    { title: "Vegetable Purchase", category: "supplies", range: [500, 3000] },
-    { title: "Rice & Flour Stock", category: "supplies", range: [2000, 8000] },
-    { title: "Cooking Oil", category: "supplies", range: [800, 2500] },
-    { title: "Spices Restocking", category: "supplies", range: [300, 1500] },
-    { title: "Electricity Bill - April", category: "utilities", range: [3000, 8000] },
-    { title: "Water Bill", category: "utilities", range: [500, 1500] },
-    { title: "Internet Bill", category: "utilities", range: [1000, 2000] },
-    { title: "Gas Cylinder x3", category: "utilities", range: [2000, 4000] },
-    { title: "Staff Salary - Ram", category: "salary", range: [12000, 18000] },
-    { title: "Staff Salary - Shyam", category: "salary", range: [10000, 15000] },
-    { title: "Part-time Helper", category: "salary", range: [5000, 8000] },
-    { title: "AC Repair", category: "maintenance", range: [2000, 5000] },
-    { title: "Plumbing Fix", category: "maintenance", range: [500, 2000] },
-    { title: "Delivery Partner Fee", category: "delivery", range: [1000, 3000] },
-    { title: "Packaging Materials", category: "delivery", range: [500, 1500] },
-    { title: "Miscellaneous", category: "other", range: [200, 1000] },
-  ];
-
-  return items.map((item, i) => ({
-    id: `exp-${i}`,
-    title: item.title,
-    description: `Payment for ${item.title.toLowerCase()}`,
-    amount: Math.floor(Math.random() * (item.range[1] - item.range[0])) + item.range[0],
-    category: item.category,
-    date: new Date(2026, 3, Math.floor(Math.random() * 10) + 1, Math.floor(Math.random() * 10) + 8),
-    paidBy: paidByOptions[Math.floor(Math.random() * paidByOptions.length)],
-    receipt: Math.random() > 0.3,
-  })).sort((a, b) => b.date.getTime() - a.date.getTime());
-};
+function downloadCSV(filename: string, rows: (string | number)[][]) {
+  const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
 
 export default function Expenses() {
-  const [expenses, setExpenses] = useState<Expense[]>(generateExpenses);
+  const { expenses, addExpense } = useData();
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("all");
   const [showAdd, setShowAdd] = useState(false);
@@ -107,13 +49,13 @@ export default function Expenses() {
   const [newDescription, setNewDescription] = useState("");
 
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
-  const thisMonthExpenses = expenses.filter((e) => e.date.getMonth() === 3).reduce((s, e) => s + e.amount, 0);
+  const thisMonth = new Date().getMonth();
+  const thisMonthExpenses = expenses.filter((e) => new Date(e.date).getMonth() === thisMonth).reduce((s, e) => s + e.amount, 0);
   const categoryTotals = Object.entries(categoryConfig).map(([key, config]) => ({
-    key,
-    ...config,
+    key, ...config,
     total: expenses.filter((e) => e.category === key).reduce((s, e) => s + e.amount, 0),
   }));
-  const topCategory = categoryTotals.sort((a, b) => b.total - a.total)[0];
+  const topCategory = [...categoryTotals].sort((a, b) => b.total - a.total)[0];
 
   const filtered = expenses.filter((e) => {
     if (search && !e.title.toLowerCase().includes(search.toLowerCase())) return false;
@@ -122,86 +64,50 @@ export default function Expenses() {
   });
 
   const handleAdd = () => {
-    if (!newTitle || !newAmount) return;
-    const expense: Expense = {
-      id: `exp-${Date.now()}`,
+    if (!newTitle || !newAmount) { toast.error("Title and amount required"); return; }
+    addExpense({
       title: newTitle,
       description: newDescription,
       amount: Number(newAmount),
       category: newCategory,
-      date: new Date(),
       paidBy: "Owner",
       receipt: false,
-    };
-    setExpenses((prev) => [expense, ...prev]);
-    setNewTitle("");
-    setNewAmount("");
-    setNewDescription("");
+    });
+    toast.success(`Expense "${newTitle}" added`);
+    setNewTitle(""); setNewAmount(""); setNewDescription("");
     setShowAdd(false);
+  };
+
+  const handleExport = () => {
+    downloadCSV("expenses.csv", [
+      ["Title", "Category", "Amount", "Paid By", "Receipt", "Date"],
+      ...filtered.map((e) => [e.title, categoryConfig[e.category].label, e.amount, e.paidBy, e.receipt ? "Yes" : "No", new Date(e.date).toLocaleString()]),
+    ]);
+    toast.success("Expenses exported");
   };
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Expenses</h1>
           <p className="text-muted-foreground text-sm">Track and manage all restaurant expenses</p>
         </div>
-        <Button className="bg-primary text-primary-foreground" onClick={() => setShowAdd(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Expense
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExport}><Download className="h-4 w-4 mr-2" /> Export</Button>
+          <Button className="bg-primary text-primary-foreground" onClick={() => setShowAdd(true)}>
+            <Plus className="h-4 w-4 mr-2" /> Add Expense
+          </Button>
+        </div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="border-border">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-destructive/10 flex items-center justify-center">
-              <TrendingDown className="h-5 w-5 text-destructive" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total Expenses</p>
-              <p className="text-xl font-bold text-foreground">₹{totalExpenses.toLocaleString()}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center">
-              <Calendar className="h-5 w-5 text-accent" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">This Month</p>
-              <p className="text-xl font-bold text-foreground">₹{thisMonthExpenses.toLocaleString()}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <PieChart className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Top Category</p>
-              <p className="text-xl font-bold text-foreground">{topCategory?.label}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
-              <IndianRupee className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Avg / Expense</p>
-              <p className="text-xl font-bold text-foreground">₹{Math.round(totalExpenses / expenses.length).toLocaleString()}</p>
-            </div>
-          </CardContent>
-        </Card>
+        <StatCard icon={TrendingDown} label="Total Expenses" value={`₹${totalExpenses.toLocaleString()}`} tone="destructive" />
+        <StatCard icon={Calendar} label="This Month" value={`₹${thisMonthExpenses.toLocaleString()}`} tone="accent" />
+        <StatCard icon={PieChart} label="Top Category" value={topCategory?.label ?? "—"} tone="primary" />
+        <StatCard icon={IndianRupee} label="Avg / Expense" value={expenses.length ? `₹${Math.round(totalExpenses / expenses.length).toLocaleString()}` : "₹0"} tone="muted" />
       </div>
 
-      {/* Category Breakdown */}
       <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
         {categoryTotals.map((cat) => (
           <Card
@@ -210,9 +116,7 @@ export default function Expenses() {
             onClick={() => setCatFilter(catFilter === cat.key ? "all" : cat.key)}
           >
             <CardContent className="p-3 text-center">
-              <div className={`h-8 w-8 rounded-lg ${cat.color} flex items-center justify-center mx-auto mb-1.5`}>
-                {cat.icon}
-              </div>
+              <div className={`h-8 w-8 rounded-lg ${cat.color} flex items-center justify-center mx-auto mb-1.5`}>{cat.icon}</div>
               <p className="text-xs text-muted-foreground">{cat.label}</p>
               <p className="text-sm font-bold text-foreground">₹{cat.total.toLocaleString()}</p>
             </CardContent>
@@ -220,7 +124,6 @@ export default function Expenses() {
         ))}
       </div>
 
-      {/* Filters */}
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -237,7 +140,6 @@ export default function Expenses() {
         </Select>
       </div>
 
-      {/* Expenses Table */}
       <div>
         <h2 className="text-lg font-semibold text-foreground mb-3">All Expenses ({filtered.length})</h2>
         <Card className="border-border overflow-hidden">
@@ -271,37 +173,25 @@ export default function Expenses() {
                     </TableCell>
                     <TableCell className="font-bold text-destructive">₹{exp.amount.toLocaleString()}</TableCell>
                     <TableCell className="text-sm">{exp.paidBy}</TableCell>
-                    <TableCell>
-                      <Badge variant={exp.receipt ? "default" : "outline"} className="text-xs">
-                        {exp.receipt ? "Yes" : "No"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {exp.date.toLocaleDateString()}
-                    </TableCell>
+                    <TableCell><Badge variant={exp.receipt ? "default" : "outline"} className="text-xs">{exp.receipt ? "Yes" : "No"}</Badge></TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{new Date(exp.date).toLocaleDateString()}</TableCell>
                   </TableRow>
                 );
               })}
+              {filtered.length === 0 && (
+                <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No expenses</TableCell></TableRow>
+              )}
             </TableBody>
           </Table>
         </Card>
       </div>
 
-      {/* Add Expense Dialog */}
       <Dialog open={showAdd} onOpenChange={setShowAdd}>
         <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add Expense</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Add Expense</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <div>
-              <Label>Title</Label>
-              <Input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="e.g. Vegetable Purchase" />
-            </div>
-            <div>
-              <Label>Amount (₹)</Label>
-              <Input type="number" value={newAmount} onChange={(e) => setNewAmount(e.target.value)} placeholder="0" />
-            </div>
+            <div><Label>Title</Label><Input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="e.g. Vegetable Purchase" /></div>
+            <div><Label>Amount (₹)</Label><Input type="number" value={newAmount} onChange={(e) => setNewAmount(e.target.value)} placeholder="0" /></div>
             <div>
               <Label>Category</Label>
               <Select value={newCategory} onValueChange={(v) => setNewCategory(v as ExpenseCategory)}>
@@ -313,17 +203,31 @@ export default function Expenses() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>Description</Label>
-              <Textarea value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Optional notes..." />
-            </div>
+            <div><Label>Description</Label><Textarea value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Optional notes..." /></div>
             <Button className="w-full bg-primary text-primary-foreground" onClick={handleAdd}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Expense
+              <Plus className="h-4 w-4 mr-2" /> Add Expense
             </Button>
           </div>
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function StatCard({ icon: Icon, label, value, tone = "primary" }: any) {
+  const bg = tone === "destructive" ? "bg-destructive/10" : tone === "accent" ? "bg-accent/10" : tone === "muted" ? "bg-muted" : "bg-primary/10";
+  const fg = tone === "destructive" ? "text-destructive" : tone === "accent" ? "text-accent" : tone === "muted" ? "text-muted-foreground" : "text-primary";
+  return (
+    <Card className="border-border">
+      <CardContent className="p-4 flex items-center gap-3">
+        <div className={`h-10 w-10 rounded-lg ${bg} flex items-center justify-center`}>
+          <Icon className={`h-5 w-5 ${fg}`} />
+        </div>
+        <div>
+          <p className="text-sm text-muted-foreground">{label}</p>
+          <p className="text-xl font-bold text-foreground">{value}</p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

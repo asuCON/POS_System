@@ -1,49 +1,20 @@
 import { useState } from "react";
-import { Plus, Users, ShoppingCart } from "lucide-react";
+import { Plus, Users, ShoppingCart, Receipt } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useNotifications } from "@/contexts/NotificationContext";
+import { useData, TableStatus } from "@/contexts/DataContext";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-
-type TableStatus = "free" | "busy" | "bill";
-
-interface RestaurantTable {
-  id: string;
-  label: string;
-  seats: number;
-  status: TableStatus;
-}
-
-const initialTables: RestaurantTable[] = [
-  { id: "d1", label: "D1", seats: 4, status: "free" },
-  { id: "d2", label: "D2", seats: 4, status: "busy" },
-  { id: "d3", label: "D3", seats: 4, status: "free" },
-  { id: "p1", label: "P1", seats: 2, status: "bill" },
-  { id: "p2", label: "P2", seats: 2, status: "busy" },
-  { id: "t1", label: "T1", seats: 6, status: "free" },
-  { id: "t2", label: "T2", seats: 6, status: "busy" },
-  { id: "vip1", label: "VIP 1", seats: 8, status: "free" },
-  { id: "vip2", label: "VIP 2", seats: 8, status: "busy" },
-  { id: "d4", label: "D4", seats: 4, status: "free" },
-  { id: "d5", label: "D5", seats: 4, status: "bill" },
-  { id: "t3", label: "T3", seats: 6, status: "free" },
-];
 
 const statusConfig: Record<TableStatus, { label: string; color: string; badgeCls: string }> = {
   free: {
@@ -66,8 +37,10 @@ const statusConfig: Record<TableStatus, { label: string; color: string; badgeCls
 type FilterType = "all" | TableStatus;
 
 const Tables = () => {
-  const [tables, setTables] = useState<RestaurantTable[]>(initialTables);
+  const { tables, addTable, setTableStatus, orders, payOrder } = useData();
   const [filter, setFilter] = useState<FilterType>("all");
+  const { addNotification } = useNotifications();
+  const navigate = useNavigate();
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newLabel, setNewLabel] = useState("");
   const [newSeats, setNewSeats] = useState("4");
@@ -83,25 +56,37 @@ const Tables = () => {
 
   const handleAddTable = () => {
     if (!newLabel.trim()) return;
-    const newTable: RestaurantTable = {
-      id: newLabel.toLowerCase().replace(/\s+/g, "-"),
-      label: newLabel.trim(),
-      seats: parseInt(newSeats) || 4,
-      status: "free",
-    };
-    setTables([...tables, newTable]);
+    addTable(newLabel.trim(), parseInt(newSeats) || 4);
+    addNotification("table", "Table Added", `New table ${newLabel.trim()} added`);
+    toast.success(`Table ${newLabel.trim()} added`);
     setNewLabel("");
     setNewSeats("4");
     setAddDialogOpen(false);
   };
 
-  const handleTakeOrder = (tableId: string) => {
-    setTables(tables.map((t) => (t.id === tableId ? { ...t, status: "busy" as TableStatus } : t)));
+  const handleTakeOrder = (label: string) => {
+    navigate(`/menu?table=${encodeURIComponent(label)}`);
+  };
+
+  const handleSettleBill = (label: string) => {
+    const tableOrder = orders.find((o) => o.table === label && (o.status === "served" || o.status === "ready" || o.status === "preparing"));
+    if (!tableOrder) {
+      // No order—just free the table
+      const tbl = tables.find((t) => t.label === label);
+      if (tbl) setTableStatus(tbl.id, "free");
+      toast.success(`Table ${label} cleared`);
+      addNotification("table", "Table Cleared", `Table ${label} has been cleared`);
+      return;
+    }
+    const bill = payOrder(tableOrder.id, "cash");
+    if (bill) {
+      toast.success(`Bill ${bill.billNumber} paid · ₹${bill.total}`);
+      addNotification("payment", "Payment Received", `Bill ${bill.billNumber} for Table ${label}`);
+    }
   };
 
   return (
     <div className="p-6 space-y-6 overflow-y-auto h-full">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Tables</h1>
@@ -112,8 +97,7 @@ const Tables = () => {
         </Button>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         {(["all", "free", "busy", "bill"] as FilterType[]).map((f) => (
           <Button
             key={f}
@@ -127,19 +111,13 @@ const Tables = () => {
         ))}
       </div>
 
-      {/* Tables Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
         {filtered.map((table) => {
           const cfg = statusConfig[table.status];
           return (
-            <Card
-              key={table.id}
-              className={`border-2 transition-colors hover:shadow-md ${cfg.color}`}
-            >
+            <Card key={table.id} className={`border-2 transition-colors hover:shadow-md ${cfg.color}`}>
               <CardContent className="p-4 flex flex-col items-center gap-3">
-                <Badge variant="outline" className={`text-xs ${cfg.badgeCls}`}>
-                  {cfg.label}
-                </Badge>
+                <Badge variant="outline" className={`text-xs ${cfg.badgeCls}`}>{cfg.label}</Badge>
                 <div className="text-center">
                   <p className="text-lg font-bold text-foreground">{table.label}</p>
                   <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
@@ -147,38 +125,18 @@ const Tables = () => {
                   </p>
                 </div>
                 {table.status === "free" && (
-                  <Button
-                    size="sm"
-                    className="w-full gap-1.5 text-xs"
-                    onClick={() => handleTakeOrder(table.id)}
-                  >
+                  <Button size="sm" className="w-full gap-1.5 text-xs" onClick={() => handleTakeOrder(table.label)}>
                     <ShoppingCart className="h-3.5 w-3.5" /> Take Order
                   </Button>
                 )}
                 {table.status === "busy" && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-full text-xs text-muted-foreground"
-                    disabled
-                  >
-                    In Progress
+                  <Button size="sm" variant="outline" className="w-full text-xs" onClick={() => navigate(`/orders?table=${encodeURIComponent(table.label)}`)}>
+                    View Order
                   </Button>
                 )}
                 {table.status === "bill" && (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="w-full text-xs"
-                    onClick={() =>
-                      setTables(
-                        tables.map((t) =>
-                          t.id === table.id ? { ...t, status: "free" } : t
-                        )
-                      )
-                    }
-                  >
-                    Clear Table
+                  <Button size="sm" variant="secondary" className="w-full text-xs gap-1.5" onClick={() => handleSettleBill(table.label)}>
+                    <Receipt className="h-3.5 w-3.5" /> Settle Bill
                   </Button>
                 )}
               </CardContent>
@@ -187,7 +145,6 @@ const Tables = () => {
         })}
       </div>
 
-      {/* Add Table Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -197,33 +154,22 @@ const Tables = () => {
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label htmlFor="table-label">Table Name</Label>
-              <Input
-                id="table-label"
-                placeholder="e.g. D6, VIP 3, P3"
-                value={newLabel}
-                onChange={(e) => setNewLabel(e.target.value)}
-              />
+              <Input id="table-label" placeholder="e.g. D6, VIP 3, P3" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="table-seats">Seats</Label>
               <Select value={newSeats} onValueChange={setNewSeats}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {[2, 4, 6, 8, 10, 12].map((n) => (
-                    <SelectItem key={n} value={String(n)}>
-                      {n} seats
-                    </SelectItem>
+                    <SelectItem key={n} value={String(n)}>{n} seats</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddDialogOpen(false)}>
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleAddTable}>Add Table</Button>
           </DialogFooter>
         </DialogContent>
