@@ -140,7 +140,7 @@ const TopNavbar = () => {
             <Button variant="ghost" size="icon" className="rounded-full">
               <Avatar className="h-8 w-8">
                 <AvatarFallback className="bg-primary text-primary-foreground text-xs font-bold">
-                  JD
+                  AD
                 </AvatarFallback>
               </Avatar>
             </Button>
@@ -148,8 +148,8 @@ const TopNavbar = () => {
           <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuLabel>
               <div>
-                <p className="text-sm font-medium">John Doe</p>
-                <p className="text-xs text-muted-foreground">Manager</p>
+                <p className="text-sm font-medium">Sudip Bishwokarma</p>
+                <p className="text-xs text-muted-foreground">Admin</p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
